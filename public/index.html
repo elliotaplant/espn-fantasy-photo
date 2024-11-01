@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESPN Fantasy Photo Host</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #e31837;
+        text-align: center;
+      }
+      .upload-container {
+        text-align: center;
+        margin: 20px 0;
+      }
+      #imageContainer {
+        max-width: 500px;
+        margin: 20px auto;
+      }
+      img {
+        max-width: 100%;
+      }
+      .btn {
+        background: #e31837;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px;
+      }
+      .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .history {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f8f8f8;
+        border-radius: 4px;
+      }
+      .history-item {
+        display: flex;
+        align-items: center;
+        margin: 10px 0;
+        padding: 10px;
+        background: white;
+        border-radius: 4px;
+      }
+      .history-item img {
+        width: 50px;
+        height: 50px;
+        margin-right: 10px;
+        object-fit: cover;
+      }
+      #result {
+        margin: 20px 0;
+        padding: 15px;
+        border-radius: 4px;
+      }
+      .success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .error {
+        background: #ffebee;
+        color: #c62828;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>ESPN Fantasy Photo Host</h1>
+
+      <div class="upload-container">
+        <input type="file" accept="image/*" id="fileInput" style="display: none" />
+        <button class="btn" id="chooseButton" onclick="document.getElementById('fileInput').click()">
+          Choose Photo
+        </button>
+        <button class="btn" id="uploadBtn" disabled>Upload Cropped Photo</button>
+      </div>
+
+      <div id="imageContainer"></div>
+
+      <div id="result"></div>
+
+      <div class="history">
+        <h2>Your Previous Uploads</h2>
+        <div id="uploadHistory"></div>
+      </div>
+    </div>
+
+    <script>
+      let cropper = null;
+      let uploadedImage = null;
+
+      // Generate a random ID for the upload
+      function generateId() {
+        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      }
+
+      // Load upload history from localStorage
+      function loadHistory() {
+        const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+        const historyContainer = document.getElementById("uploadHistory");
+        historyContainer.innerHTML = "";
+
+        history.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = "history-item";
+          div.innerHTML = `
+                    <img src="${item.url}" alt="Uploaded photo">
+                    <div>
+                        <div>ID: ${item.id}</div>
+                        <div>Uploaded: ${new Date(item.date).toLocaleDateString()}</div>
+                    </div>
+                `;
+          historyContainer.appendChild(div);
+        });
+      }
+
+      // Add a new upload to history
+      function addToHistory(id, url) {
+        const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+        history.unshift({
+          id,
+          url,
+          date: new Date().toISOString(),
+        });
+        localStorage.setItem("uploadHistory", JSON.stringify(history.slice(0, 10))); // Keep last 10
+        loadHistory();
+      }
+
+      // Resize image to 300x300 if larger
+      function resizeImage(canvas) {
+        if (canvas.width <= 300 && canvas.height <= 300) {
+          return canvas;
+        }
+
+        const resizeCanvas = document.createElement("canvas");
+        resizeCanvas.width = 300;
+        resizeCanvas.height = 300;
+        const ctx = resizeCanvas.getContext("2d");
+        ctx.drawImage(canvas, 0, 0, 300, 300);
+        return resizeCanvas;
+      }
+
+      // Show result message
+      function showResult(message, isError = false) {
+        const result = document.getElementById("result");
+        result.textContent = message;
+        result.className = isError ? "error" : "success";
+      }
+
+      // Handle file selection
+      document.getElementById("fileInput").addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+          showResult("Please select an image file.", true);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          if (cropper) {
+            cropper.destroy();
+          }
+
+          const imageContainer = document.getElementById("imageContainer");
+          imageContainer.innerHTML = `<img id="uploadedImage" src="${event.target.result}">`;
+
+          uploadedImage = document.getElementById("uploadedImage");
+          cropper = new Cropper(uploadedImage, {
+            aspectRatio: 1,
+            viewMode: 1,
+            autoCropArea: 1,
+          });
+
+          uploadBtn.disabled = false;
+          chooseBtm.disabled = true;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Handle upload
+      uploadBtn.addEventListener("click", async function () {
+        if (!cropper) return;
+
+        try {
+          // Get cropped canvas and resize if necessary
+          const croppedCanvas = cropper.getCroppedCanvas();
+          const finalCanvas = resizeImage(croppedCanvas);
+
+          // Convert to blob
+          const blob = await new Promise((resolve) => {
+            finalCanvas.toBlob(resolve, "image/jpeg", 0.9);
+          });
+
+          // Generate ID for the upload
+          const id = generateId();
+
+          // Upload to worker
+          const response = await fetch("/" + id, {
+            method: "PUT",
+            body: blob,
+          });
+
+          if (!response.ok) throw new Error("Upload failed");
+
+          // Add to history
+          const imageUrl = "/" + id;
+          addToHistory(id, imageUrl);
+
+          showResult(`Upload successful! Your image ID is: ${id}`);
+
+          // Reset the upload form
+          cropper.destroy();
+          cropper = null;
+          document.getElementById("imageContainer").innerHTML = "";
+          document.getElementById("fileInput").value = "";
+          uploadBtn.disabled = true;
+        } catch (error) {
+          showResult("Error uploading image: " + error.message, true);
+        }
+      });
+
+      // Load history on page load
+      loadHistory();
+    </script>
+  </body>
+</html>

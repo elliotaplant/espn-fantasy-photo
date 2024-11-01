@@ -10,7 +10,8 @@ export default {
     const key: string = url.pathname.slice(1);
 
     if (!key) {
-      // return HTML page
+      const response = await fetch(new URL("/index.html", request.url));
+      return response;
     }
 
     switch (request.method) {
