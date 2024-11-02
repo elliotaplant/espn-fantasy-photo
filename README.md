@@ -23,7 +23,7 @@ A simple and efficient photo hosting service built specifically for ESPN Fantasy
 1. Clone the repository:
 
 ```bash
-git clone [your-repo-url]
+git clone https://github.com/elliotaplant/espn-fantasy-photo
 cd espn-fantasy-photo
 ```
 
@@ -36,7 +36,7 @@ npm install
 3. Configure your Cloudflare R2 bucket:
 
    - Create an R2 bucket named `ESPN_FANTASY_PHOTOS_BUCKET` in your Cloudflare account
-   - Update your `wrangler.toml` with the appropriate bucket binding
+   - Update your `wrangler.toml` with the appropriate bucket binding if you used a different name
 
 4. Development:
 
